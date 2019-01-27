@@ -1,0 +1,18 @@
+<component name="ProjectDictionaryState">
+  <dictionary name="24900">
+    <words>
+      <w>dbname</w>
+      <w>distlock</w>
+      <w>gotest</w>
+      <w>pgsql</w>
+      <w>rlock</w>
+      <w>runlock</w>
+      <w>rwmtx</w>
+      <w>rwmutex</w>
+      <w>rwtouch</w>
+      <w>sslmode</w>
+      <w>wlock</w>
+      <w>wunlock</w>
+    </words>
+  </dictionary>
+</component>
