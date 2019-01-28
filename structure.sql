@@ -51,7 +51,7 @@ EXCEPTION
 		RETURN 0;
 	WHEN lock_not_available THEN
 		SELECT "mtx_expiry" INTO expiry FROM "distlock"."mutex" WHERE "mtx_name" = $1;
-		IF expiry IS NOT NULL AND expiry >= tstamp THEN
+		IF expiry > tstamp THEN
 			RETURN expiry - tstamp;
     END IF;
 		RETURN 0;
@@ -64,10 +64,10 @@ $$ LANGUAGE PLPGSQL VOLATILE;
 CREATE OR REPLACE FUNCTION "distlock"."unlock"(VARCHAR,VARCHAR,VARCHAR)
 RETURNS CHAR AS $$
 DECLARE
-	mtxname VARCHAR;
+	mtxvalue VARCHAR;
 BEGIN
-	SELECT "mtx_name" INTO mtxname FROM "distlock"."mutex" WHERE "mtx_name" = $1 AND "mtx_value" = $2 FOR UPDATE;
-	IF mtxname IS NOT NULL THEN
+	SELECT "mtx_value" INTO mtxvalue FROM "distlock"."mutex" WHERE "mtx_name" = $1 FOR UPDATE;
+	IF mtxvalue = $2 THEN
 		UPDATE "distlock"."mutex" SET "mtx_value" = '', "mtx_expiry" = 0 WHERE "mtx_name" = $1;
     PERFORM PG_NOTIFY($3, '1');
 	END IF;
@@ -200,7 +200,7 @@ EXCEPTION
 		RETURN 0;
   WHEN lock_not_available THEN
 		SELECT "rwmtx_expiry" INTO expiry FROM "distlock"."rwmutex" WHERE "rwmtx_name" = $1;
-    IF expiry IS NOT NULL AND expiry >= tstamp THEN
+    IF expiry > tstamp THEN
 			RETURN expiry - tstamp;
     END IF;
 		RETURN 0;
