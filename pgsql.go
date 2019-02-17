@@ -2,6 +2,7 @@ package pgsql
 
 import (
 	"database/sql"
+	"math/rand"
 	"time"
 
 	"github.com/go-locks/distlock/driver"
@@ -49,10 +50,16 @@ func (pd *pgsqlDriver) channelName(name string) string {
 func (pd *pgsqlDriver) doLock(fn func(db *sql.DB) int) (bool, time.Duration) {
 	counter, minWait := 0, -1
 	for _, db := range pd.dbs {
-		if wait := fn(db); wait == -3 {
-			counter++
-		} else if minWait > wait || minWait == -1 {
-			minWait = wait
+		for {
+			if wait := fn(db); wait == 0 {
+				time.Sleep(time.Duration(rand.Int31n(1000 * 1000)))
+				continue // retry
+			} else if wait == -3 {
+				counter++ // succeed
+			} else if wait > 0 && (minWait > wait || minWait < 0) {
+				minWait = wait
+			}
+			break
 		}
 	}
 	var w time.Duration

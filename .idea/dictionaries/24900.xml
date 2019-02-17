@@ -4,6 +4,7 @@
       <w>dbname</w>
       <w>distlock</w>
       <w>gotest</w>
+      <w>hmap</w>
       <w>pgsql</w>
       <w>rlock</w>
       <w>runlock</w>

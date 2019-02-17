@@ -26,8 +26,12 @@
 
 
 [[constraint]]
-  branch = "master"
   name = "github.com/go-locks/distlock"
+  branch = "master"
+
+[[constraint]]
+  name = "github.com/go-locks/testcase"
+  branch = "master"
 
 [[constraint]]
   name = "github.com/lib/pq"
