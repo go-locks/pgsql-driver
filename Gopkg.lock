@@ -3,19 +3,19 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:b977b0cac9d3116020cc9806dfefcea558b716808d8db5bcd091a4961cecada6"
+  digest = "1:6e0384cdafd1288aa955c84591ccb3d0b417ee639ec4f11afbf7b57667f6dbd4"
   name = "github.com/go-locks/distlock"
   packages = ["driver"]
   pruneopts = "UT"
-  revision = "afdffbb62632ee5f3bb35fc286c534011674bf87"
+  revision = "8c387c9fc779d8e8e0990f09a770b0ce1debb005"
 
 [[projects]]
   branch = "master"
-  digest = "1:0fc30ee071fb2ab89a1028c42bca32e097cbfbbee8c9c99963b1ad925aa75123"
+  digest = "1:a3197d34f72543f86a4412e93c0ea6045dbd5afee2a096bc1449751e55eefd09"
   name = "github.com/go-locks/testcase"
   packages = ["."]
   pruneopts = "UT"
-  revision = "ce6ad9c540beaed10367a35e9d947f494b073aeb"
+  revision = "1f257e03718ff8503f544be944e6c47a3bbd5402"
 
 [[projects]]
   digest = "1:8ef506fc2bb9ced9b151dafa592d4046063d744c646c1bbe801982ce87e4bc24"

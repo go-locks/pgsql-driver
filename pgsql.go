@@ -48,37 +48,37 @@ func (pd *pgsqlDriver) channelName(name string) string {
 }
 
 func (pd *pgsqlDriver) doLock(fn func(db *sql.DB) int) (bool, time.Duration) {
-	counter, minWait := 0, -1
+	counter := pd.quorum
 	for _, db := range pd.dbs {
 		for {
 			if wait := fn(db); wait == 0 {
 				time.Sleep(time.Duration(rand.Int31n(1000 * 1000)))
-				continue // retry
+				continue
 			} else if wait == -3 {
-				counter++ // succeed
-			} else if wait > 0 && (minWait > wait || minWait < 0) {
-				minWait = wait
+				counter -= 1
+				if counter == 0 {
+					return true, 0
+				}
+			} else if wait > 0 {
+				return false, time.Duration(wait) * time.Second
 			}
 			break
 		}
 	}
-	var w time.Duration
-	if minWait > 0 {
-		w = time.Duration(minWait) * time.Millisecond
-	} else {
-		w = time.Duration(minWait) // less than zero, use the default wait duration
-	}
-	return counter >= pd.quorum, w
+	return false, -1
 }
 
 func (pd *pgsqlDriver) doTouch(fn func(db *sql.DB) bool) bool {
-	var counter int
+	counter := pd.quorum
 	for _, db := range pd.dbs {
 		if fn(db) {
-			counter++
+			counter -= 1
+			if counter == 0 {
+				return true
+			}
 		}
 	}
-	return counter >= pd.quorum
+	return false
 }
 
 func (pd *pgsqlDriver) Lock(name, value string, expiry time.Duration) (ok bool, wait time.Duration) {
@@ -96,8 +96,8 @@ func (pd *pgsqlDriver) Lock(name, value string, expiry time.Duration) (ok bool, 
 func (pd *pgsqlDriver) Unlock(name, value string) {
 	channel := pd.channelName(name)
 	for _, db := range pd.dbs {
-		var str string
-		err := db.QueryRow("SELECT distlock.unlock($1, $2, $3);", name, value, channel).Scan(&str)
+		var res bool
+		err := db.QueryRow("SELECT distlock.unlock($1, $2, $3);", name, value, channel).Scan(&res)
 		if err != nil {
 			logrus.WithError(err).Errorf("pgsql release lock '%s' failed", name)
 		}
@@ -130,8 +130,8 @@ func (pd *pgsqlDriver) RLock(name, value string, expiry time.Duration) (ok bool,
 func (pd *pgsqlDriver) RUnlock(name, value string) {
 	channel := pd.channelName(name)
 	for _, db := range pd.dbs {
-		var str string
-		err := db.QueryRow("SELECT distlock.runlock($1, $2, $3, $4);", name, value, channel, MaxReaders).Scan(&str)
+		var res bool
+		err := db.QueryRow("SELECT distlock.runlock($1, $2, $3, $4);", name, value, channel, MaxReaders).Scan(&res)
 		if err != nil {
 			logrus.WithError(err).Errorf("pgsql release read lock '%s' failed", name)
 		}
@@ -143,7 +143,7 @@ func (pd *pgsqlDriver) RTouch(name, value string, expiry time.Duration) (ok bool
 	return pd.doTouch(func(db *sql.DB) (ok bool) {
 		err := db.QueryRow("SELECT distlock.rwtouch($1, $2, $3);", name, value, msExpiry).Scan(&ok)
 		if err != nil {
-			logrus.WithError(err).Errorf("pgsql touch rw lock '%s' failed", name)
+			logrus.WithError(err).Errorf("pgsql touch read write lock '%s' failed", name)
 		}
 		return
 	})
@@ -164,8 +164,8 @@ func (pd *pgsqlDriver) WLock(name, value string, expiry time.Duration) (ok bool,
 func (pd *pgsqlDriver) WUnlock(name, value string) {
 	channel := pd.channelName(name)
 	for _, db := range pd.dbs {
-		var str string
-		err := db.QueryRow("SELECT distlock.wunlock($1, $2, $3, $4);", name, value, channel, MaxReaders).Scan(&str)
+		var res bool
+		err := db.QueryRow("SELECT distlock.wunlock($1, $2, $3, $4);", name, value, channel, MaxReaders).Scan(&res)
 		if err != nil {
 			logrus.WithError(err).Errorf("pgsql release write lock '%s' failed", name)
 		}
@@ -180,7 +180,7 @@ func (pd *pgsqlDriver) Watch(name string) <-chan struct{} {
 	channel := pd.channelName(name)
 	outChan := make(chan struct{})
 	for _, dsn := range pd.dsn {
-		go func() {
+		go func(dsn string) {
 			listener := pq.NewListener(dsn, MinWatchRetryInterval, MaxWatchRetryInterval, func(event pq.ListenerEventType, err error) {
 				if err != nil {
 					logrus.WithError(err).Errorf("pgsql listen channel '%s' error", channel)
@@ -194,7 +194,7 @@ func (pd *pgsqlDriver) Watch(name string) <-chan struct{} {
 				<-listener.Notify
 				outChan <- struct{}{}
 			}
-		}()
+		}(dsn)
 	}
 	return outChan
 }

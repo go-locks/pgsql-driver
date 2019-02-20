@@ -10,5 +10,6 @@ var pgDriver = New(
 	"host=192.168.0.110 port=5432 user=postgres password= dbname=gotest sslmode=disable",
 	// 可继续指定其他节点，当有多个节点时，在过半数节点上加锁成功才算真的成功
 	// "host=192.168.0.111 port=5432 user=postgres password= dbname=gotest sslmode=disable",
+	// "host=192.168.0.112 port=5432 user=postgres password= dbname=gotest sslmode=disable",
 )
 ```

@@ -6,6 +6,7 @@
       <w>gotest</w>
       <w>hmap</w>
       <w>pgsql</w>
+      <w>postgresql</w>
       <w>rlock</w>
       <w>runlock</w>
       <w>rwmtx</w>

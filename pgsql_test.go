@@ -6,7 +6,11 @@ import (
 	"github.com/go-locks/testcase"
 )
 
-var pgDriver = New("host=192.168.0.110 port=5432 user=postgres password= dbname=filesystem sslmode=disable")
+var pgDriver = New(
+	"host=192.168.0.110 port=5432 user=postgres password= dbname=gotest sslmode=disable",
+	"host=192.168.0.111 port=5432 user=postgres password= dbname=gotest sslmode=disable",
+	"host=192.168.0.112 port=5432 user=postgres password= dbname=gotest sslmode=disable",
+)
 
 func TestPgsqlDriver_Lock(t *testing.T) {
 	testcase.RunLockTest(pgDriver, t)

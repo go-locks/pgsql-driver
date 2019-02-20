@@ -35,7 +35,7 @@ DECLARE
   expiry BIGINT;
   tstamp BIGINT;
 BEGIN
-	SELECT CEIL(EXTRACT(EPOCH FROM NOW()) *1000) INTO tstamp;
+	SELECT CEIL(EXTRACT(EPOCH FROM NOW()) * 1000) INTO tstamp;
 	SELECT "mtx_expiry" INTO expiry FROM "distlock"."mutex" WHERE "mtx_name" = $1 FOR UPDATE NOWAIT;
   IF expiry IS NOT NULL THEN
     IF expiry > tstamp THEN
@@ -68,7 +68,7 @@ DECLARE
 BEGIN
 	SELECT "mtx_value" INTO mtxvalue FROM "distlock"."mutex" WHERE "mtx_name" = $1 FOR UPDATE;
 	IF mtxvalue = $2 THEN
-		UPDATE "distlock"."mutex" SET "mtx_value" = '', "mtx_expiry" = 0 WHERE "mtx_name" = $1;
+		UPDATE "distlock"."mutex" SET "mtx_expiry" = 0 WHERE "mtx_name" = $1;
     PERFORM PG_NOTIFY($3, '1');
     RETURN TRUE;
 	END IF;
@@ -86,7 +86,7 @@ DECLARE
 	record RECORD;
 	counter SMALLINT;
 BEGIN
-	SELECT CEIL(EXTRACT(EPOCH FROM NOW()) *1000) INTO tstamp;
+	SELECT CEIL(EXTRACT(EPOCH FROM NOW()) * 1000) INTO tstamp;
 	SELECT * INTO record FROM "distlock"."mutex" WHERE "mtx_name" = $1 FOR UPDATE;
 	IF record IS NOT NULL AND record."mtx_value" = $2 AND record."mtx_expiry" > tstamp THEN
 		UPDATE "distlock"."mutex" SET "mtx_expiry" = tstamp + $3 WHERE "mtx_name" = $1;
@@ -107,15 +107,16 @@ DECLARE
 	record RECORD;
 	counter BIGINT;
 BEGIN
-	SELECT CEIL(EXTRACT(EPOCH FROM NOW()) *1000) INTO tstamp;
+	SELECT CEIL(EXTRACT(EPOCH FROM NOW()) * 1000) INTO tstamp;
 	SELECT * INTO record FROM "distlock"."rwmutex" WHERE "rwmtx_name" = $1 FOR UPDATE NOWAIT;
 	IF record IS NOT NULL THEN
+	  IF record."rwmtx_expiry" <= tstamp THEN
+	    UPDATE "distlock"."rwmutex" SET "rwmtx_expiry" = $3 + tstamp, "rwmtx_count" = 1,
+			  "rwmtx_hmap" = JSONB_BUILD_OBJECT($2, 1) WHERE "rwmtx_name" = $1;
+      RETURN -3;
+	  END IF;
 		IF record."rwmtx_count" < 0 THEN
-			IF record."rwmtx_expiry" > tstamp THEN
-				RETURN record."rwmtx_expiry" - tstamp;
-			END IF;
-			DELETE FROM "distlock"."rwmutex" WHERE "rwmtx_name" = $1;
-			RETURN 0;
+      RETURN record."rwmtx_expiry" - tstamp;
 		END IF;
 		SELECT "value" INTO counter FROM JSONB_EACH(record."rwmtx_hmap") WHERE "key" = $2;
 		IF counter IS NULL THEN
@@ -147,7 +148,7 @@ BEGIN
 	SELECT * INTO record FROM "distlock"."rwmutex" WHERE "rwmtx_name" = $1 FOR UPDATE;
 	IF record IS NOT NULL AND (record."rwmtx_count" >= 0 OR record."rwmtx_count" + $4 >= 0) THEN
 		SELECT "value" INTO counter FROM JSONB_EACH(record."rwmtx_hmap") WHERE "key" = $2;
-		IF counter IS NOT NULL THEN
+		IF counter IS NOT NULL AND counter > 0 THEN
       IF counter = 1 THEN
         UPDATE "distlock"."rwmutex" SET "rwmtx_hmap" = "rwmtx_hmap" - $2, "rwmtx_count" = "rwmtx_count" - 1 WHERE "rwmtx_name" = $1;
         IF record."rwmtx_count" = 1 OR (record."rwmtx_count" + $4) = 1 THEN
@@ -174,12 +175,12 @@ DECLARE
   record RECORD;
   counter SMALLINT;
 BEGIN
-  SELECT CEIL(EXTRACT(EPOCH FROM NOW()) *1000) INTO tstamp;
+  SELECT CEIL(EXTRACT(EPOCH FROM NOW()) * 1000) INTO tstamp;
   SELECT * INTO record FROM "distlock"."rwmutex" WHERE "rwmtx_name" = $1 FOR UPDATE NOWAIT;
   IF record IS NULL THEN
     INSERT INTO "distlock"."rwmutex" ("rwmtx_name", "rwmtx_hmap", "rwmtx_expiry", "rwmtx_count") VALUES ($1, JSONB_BUILD_OBJECT($2, 0), $3 + tstamp, 0 - $4);
 		RETURN -3;
-  ELSEIF record."rwmtx_expiry" < tstamp THEN
+  ELSEIF record."rwmtx_expiry" <= tstamp THEN
     UPDATE "distlock"."rwmutex" SET "rwmtx_hmap" = JSONB_BUILD_OBJECT($2, 0), "rwmtx_expiry" = $3 + tstamp, "rwmtx_count" = 0 - $4 WHERE "rwmtx_name" = $1;
     RETURN -3;
   ELSE
@@ -239,7 +240,7 @@ DECLARE
 	record RECORD;
 	counter SMALLINT;
 BEGIN
-	SELECT CEIL(EXTRACT(EPOCH FROM NOW()) *1000) INTO tstamp;
+	SELECT CEIL(EXTRACT(EPOCH FROM NOW()) * 1000) INTO tstamp;
 	SELECT * INTO record FROM "distlock"."rwmutex" WHERE "rwmtx_name" = $1 FOR UPDATE;
 	IF record IS NOT NULL AND record."rwmtx_expiry" > tstamp THEN
 		SELECT COUNT(*) INTO counter FROM JSONB_EACH(record."rwmtx_hmap") WHERE "key" = $2;
